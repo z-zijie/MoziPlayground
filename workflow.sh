@@ -58,9 +58,9 @@ print(review["review_result"]["total_score"])
 PY
 )"
 
-PRD_READY=false
+PRD_REVIEW_PASSED=false
 if [[ "$review_score" -gt 95 ]]; then
-  PRD_READY=true
+  PRD_REVIEW_PASSED=true
 fi
 
-echo "PRD_READY=${PRD_READY}"
+echo "PRD_REVIEW_PASSED=${PRD_REVIEW_PASSED}"
