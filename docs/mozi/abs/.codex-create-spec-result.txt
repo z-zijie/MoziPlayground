@@ -1,0 +1,3 @@
+已基于 `/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/prd.md` 生成并覆盖 `SPEC`，文件为 [`/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md`](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md)。
+
+已通过 Mozi 校验。
