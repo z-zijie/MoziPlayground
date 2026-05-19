@@ -1,163 +1,127 @@
 # Abs SPEC
 
 ## 1. Overview / 概述
-Abs 算子根据 PRD 定义，对输入 float32 Tensor `x` 的每个元素执行绝对值变换，返回同 shape、同 dtype 的 float32 Tensor `y`。对每个有效元素索引 `i`，结果满足 `y[i] = |x[i]|`。
+Abs 是逐元素绝对值算子。它接收一个 float32 Tensor `x`，返回一个与输入 shape、rank、layout 和 dtype 保持一致的 float32 Tensor `y`，并对每个有效元素索引 `i` 满足 `y[i] = |x[i]|`。
 
-本 SPEC 是从 `/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/prd.md` 生成的行为契约，用于约束后续 DESIGN、实现和测试阶段。本文档只描述外部可观察的接口、输入输出、数学语义、数值语义、shape/dtype 规则、边界行为和验收标准，不规定 kernel 设计、tiling、内存规划、调度方式或硬件指令选择。
+本 SPEC 基于 `docs/mozi/abs/prd.md` 中的 Abs PRD 生成，用于定义后续 DESIGN 和实现阶段可依赖的外部可观察行为契约，不包含 kernel 设计、tiling 策略、内存规划、调度方式或硬件指令选择。
 
 ## 2. Scope / 范围
-本 SPEC 覆盖 NPU ARCH dav-2201 上的 Abs 正向算子行为，功能范围包括：
+本 SPEC 覆盖 NPU ARCH dav-2201 上 float32 Tensor 的 Abs 行为，包括任意维度 Tensor、0 维标量 Tensor、空 Tensor，以及 `+0.0`、`-0.0`、`NaN`、`+Inf`、`-Inf` 等 float32 边界数值。
 
-- 输入一个 float32 Tensor `x`，输出一个 float32 Tensor `y`。
-- 输出 shape 与输入 shape 完全相同。
-- 对所有元素独立计算绝对值，不进行广播、规约、reshape 或跨元素依赖计算。
-- 支持任意维度 Tensor，包括 0 维标量 Tensor、1 维及以上 Tensor、任一维长度为 0 的空 Tensor。
-- 覆盖正有限数、负有限数、`+0.0`、`-0.0`、`NaN`、`+Inf`、`-Inf` 的 float32 数值语义。
-
-本 SPEC 明确排除以下行为：
-
-- float32 以外的 dtype。
-- 复数、量化、稀疏 Tensor 或非 Tensor 输入。
-- 梯度、反向传播或训练框架自动微分行为。
-- 输入 shape、rank、layout 或 dtype 的改变。
-- 性能、吞吐或延迟目标。
+本 SPEC 不覆盖 float32 以外 dtype、复数、量化 Tensor、稀疏 Tensor、非 Tensor 输入、梯度、反向传播、训练框架自动微分行为，也不要求定义性能、吞吐或延迟指标。
 
 ## 3. Supported Platforms / 支持的NPU平台
-目标平台范围为 NPU ARCH dav-2201。平台相关约束仅限于 PRD 指定的产品行为、接口、数值语义和验收要求；本 SPEC 不规定任何硬件执行设计。
+目标平台范围为 NPU ARCH dav-2201。Abs 在该平台上的产品行为、输入输出接口、数值语义和验收要求必须符合本 SPEC。
+
+本 SPEC 不定义 dav-2201 以外平台的行为兼容性要求。
 
 ## 4. Operator Interface / 算子接口
 ### PyTorch ATen IR
+
+Schema:
 
 ```text
 aten::abs(Tensor self) -> Tensor
 ```
 
-`self` 对应本 SPEC 中的输入 Tensor `x`，返回值对应输出 Tensor `y`。本 SPEC 仅要求 `self` 为 float32 Tensor。
-
 ### Pure Python Signature
 
+Signature:
+
 ```python
-def abs(x):
-    """
-    Compute elementwise absolute value for a float32 Tensor.
+def abs(self):
+    """Compute elementwise absolute value for a float32 tensor.
 
     Args:
-        x: Required input Tensor. It must be a float32 Tensor with any legal
-            Tensor rank and shape, including rank-0 scalar tensors and tensors
-            with zero-sized dimensions. The input participates as a read-only
-            operand: Abs must not mutate its values, shape, rank, layout, or
-            dtype. No default value is defined, and the parameter is not
-            optional. Non-Tensor inputs, sparse tensors, quantized tensors,
-            complex tensors, and dtypes other than float32 are outside the
-            supported functional scope.
+        self: Required input tensor `x`. It must be a Tensor with dtype float32,
+            any valid rank including rank 0, and any valid shape including shapes
+            with zero-sized dimensions. The tensor layout is preserved by the
+            result. `self` is read-only for this operator and must not be
+            modified by the call. No default value is defined and `None` is not
+            a valid input.
 
     Returns:
-        A float32 Tensor with exactly the same shape and rank as x. For every
-        valid element index i, the returned tensor y satisfies y[i] = |x[i]|.
-        Empty inputs return empty outputs with matching metadata, and scalar
-        inputs return scalar outputs. The returned value is the output tensor
-        of the operator; this API does not define an in-place aliasing form.
+        A float32 Tensor `y` with the same shape, rank, and layout as `self`.
+        For every valid element index `i`, `y[i] = |self[i]|`.
 
-    Mathematical and numeric semantics:
-        The operator is elementwise and has no broadcasting, reduction, reshape,
-        or cross-element dependency. Positive finite float32 values are returned
-        unchanged, negative finite values return the corresponding positive
-        magnitude, +0.0 returns +0.0, -0.0 returns numeric +0.0, +Inf returns
-        +Inf, -Inf returns +Inf, and NaN returns NaN. The PRD does not require
-        preservation of NaN payload or NaN sign bit.
+    Raises:
+        TypeError: If `self` is not a Tensor or its dtype is not float32.
     """
-    pass
 ```
 
 ### Pure C++ Signature
 
+Framework-independent signature:
+
 ```cpp
 /**
- * @brief Compute elementwise absolute value for a float32 Tensor.
+ * @brief Computes elementwise absolute value for a float32 tensor.
  *
- * Constraints: x must be a Tensor with dtype float32. Any legal tensor rank and
- * shape are supported, including rank-0 scalar tensors and tensors with
- * zero-sized dimensions. Dtypes other than float32, non-Tensor inputs, sparse
- * tensors, quantized tensors, and complex tensors are outside the supported
- * functional scope. Abs does not broadcast, reduce, reshape, or otherwise
- * change rank, shape, layout, or dtype.
+ * @param self Required input tensor x. The tensor element type is float, which
+ * represents float32. The tensor may have any valid rank including rank 0 and
+ * any valid shape including shapes with zero-sized dimensions. The input layout
+ * is preserved by the returned tensor. The input is read-only and must not be
+ * modified. No optional input form or default value is defined.
  *
- * Numeric semantics: for every element, positive finite values are returned
- * unchanged, negative finite values return their positive magnitude, +0.0
- * returns +0.0, -0.0 returns numeric +0.0, +Inf returns +Inf, -Inf returns
- * +Inf, and NaN returns NaN. No additional approximation tolerance is defined.
- * The PRD does not require preservation of NaN payload or NaN sign bit.
+ * @return Tensor<float> Output tensor y with the same shape, rank, layout, and
+ * dtype as self. For every valid element index i, y[i] is the absolute value of
+ * self[i].
  *
- * Memory semantics: x is a read-only operand and must not be mutated. The
- * returned Tensor is the operator output. This signature does not define an
- * in-place aliasing form.
- *
- * @param x Required input Tensor. It provides the element values and metadata
- *     for Abs. x must have dtype float32, may have any legal rank and shape,
- *     may be rank-0, and may contain zero-sized dimensions. x has no default
- *     value and is not optional.
- * @return Tensor A float32 Tensor y with exactly the same rank and shape as x,
- *     where each element satisfies y[i] = |x[i]|.
+ * @throws TypeError If the caller provides a non-tensor value or a tensor whose
+ * dtype is not float32.
  */
-Tensor Abs(const Tensor& x);
+Tensor<float> Abs(const Tensor<float>& self);
 ```
 
 ## 5. Input Specification / 输入规格
-`x` 是唯一输入操作数：
+`self` / `x` 是唯一输入。
 
-- 类型：Tensor。
-- dtype：必须为 float32。
-- rank：任意合法 Tensor rank，包括 0 维标量 Tensor。
-- shape：任意合法 Tensor shape；每个维度大小为合法非负整数；允许任一维长度为 0。
-- value domain：任意 float32 值，包括有限数、`+0.0`、`-0.0`、`NaN`、`+Inf`、`-Inf`。
-- layout/format：PRD 不引入额外 layout 或 format 限制；Abs 不应改变输入输出可观察的 shape、rank、layout 或 dtype。
-- optionality：必选输入，不支持省略。
-- aliasing/mutability：`x` 是只读输入；算子不得修改输入 Tensor 的值或元数据。
-- unsupported inputs：float32 以外 dtype、复数、量化、稀疏 Tensor、非 Tensor 输入不属于本 SPEC 的支持范围。
+| Property / 属性 | Specification / 规格 |
+| --- | --- |
+| Operand kind | Required Tensor input |
+| Dtype | float32 only |
+| Rank | Any valid Tensor rank, including rank 0 scalar Tensor |
+| Shape | Any valid Tensor shape; zero-sized dimensions are supported |
+| Value domain | All float32 values, including finite values, `+0.0`, `-0.0`, `NaN`, `+Inf`, and `-Inf` |
+| Layout | Input layout is not changed by this operator |
+| Optionality | Required; `None` is not valid |
+| Aliasing and mutability | The input is read-only and must not be modified by the operator |
 
 ## 6. Output Specification / 输出规格
-`y` 是唯一输出值：
+The operator returns one Tensor `y`.
 
-- 类型：Tensor。
-- dtype：float32，与输入 `x` 相同。
-- rank：与 `x` 完全相同。
-- shape：与 `x` 完全相同，包括标量 shape `()` 与包含零维长度的空 Tensor shape。
-- value domain：float32 值；每个输出元素为对应输入元素的绝对值。
-- layout/format：不得改变 PRD 约束下可观察的输入 layout/format 语义；本 SPEC 不定义 layout 转换行为。
-- aliasing/mutability：返回值是 Abs 的输出 Tensor；本 SPEC 不定义 in-place 形式，且不得通过输出行为修改输入 `x`。
-- determinism：对同一合法输入，输出 shape、dtype 和每个元素的数值语义确定。
+| Property / 属性 | Specification / 规格 |
+| --- | --- |
+| Operand kind | Tensor output |
+| Dtype | float32, identical to input dtype |
+| Rank | Identical to input rank |
+| Shape | Identical to input shape |
+| Layout | Identical to input layout |
+| Value domain | float32 absolute-value results, including `+0.0`, `NaN`, and `+Inf` boundary results |
+| Aliasing and mutability | The operator is functional: it must not mutate `self`; the returned value is the observable Abs result |
+| Determinism | For the same input Tensor values and metadata, output values and metadata are deterministic |
+
+For an empty Tensor, `y` is an empty Tensor with the same shape, dtype, rank, and layout as `self`.
 
 ## 7. Attribute Specification / 属性规格
-Abs 不定义任何 operator attribute。算子行为完全由输入 Tensor `x` 决定。
+Abs defines no operator attributes. There is no attribute type, default value, valid range, or attribute-input interaction.
 
 ## 8. Mathematical Semantics / 数学语义
-令输入 Tensor 为：
+Let the input tensor be \(x \in \mathbb{F}_{32}^{S}\), where \(S = (s_0, s_1, \ldots, s_{r-1})\) is any valid tensor shape with rank \(r \ge 0\), and \(\mathbb{F}_{32}\) is the set of IEEE 754 float32 values relevant to the PRD, including finite values, signed zeros, infinities, and NaN.
+
+Abs is the mapping:
 
 \[
-x \in \mathbb{F}_{32}^{S}
+\operatorname{Abs}: \mathbb{F}_{32}^{S} \rightarrow \mathbb{F}_{32}^{S}
 \]
 
-其中 \(S = (d_0, d_1, \ldots, d_{r-1})\) 是合法 Tensor shape，\(r \ge 0\)，每个 \(d_k \in \mathbb{N}\)。当 \(r = 0\) 时，\(S = ()\) 表示标量 Tensor。当存在 \(d_k = 0\) 时，索引集合为空。
-
-输出 Tensor 为：
+For every valid index \(i \in S\):
 
 \[
-y = \operatorname{Abs}(x) \in \mathbb{F}_{32}^{S}
+y_i = \operatorname{Abs}(x)_i = |x_i|
 \]
 
-对所有有效索引：
-
-\[
-i \in I(S) = \{(i_0,\ldots,i_{r-1}) \mid 0 \le i_k < d_k\}
-\]
-
-逐元素定义为：
-
-\[
-y_i = |x_i|
-\]
-
-其中：
+For finite real-valued float32 inputs:
 
 \[
 |a| =
@@ -167,183 +131,175 @@ a, & a \ge 0 \\
 \end{cases}
 \]
 
-该映射不改变 Tensor 的 shape、rank 或 dtype，不引入广播、规约、重排或跨元素依赖。对空索引集合 \(I(S)=\varnothing\)，输出仍具有 shape \(S\)，且没有元素级结果需要计算。
+The mapping is elementwise. It does not perform broadcasting, reduction, reshape, permutation, or any cross-element computation.
+
+For an empty shape domain with no valid element indices, the mapping returns an empty tensor over the same shape \(S\) without elementwise values to compute.
 
 ## 9. Functional Semantics / 功能语义
-Abs 的可观察功能语义如下：
+Abs applies the float32 absolute-value operation independently to each element of `self`.
 
-- 对输入 Tensor 的每个元素独立执行绝对值计算。
-- 输出 Tensor 与输入 Tensor shape 完全相同。
-- 输出 Tensor 与输入 Tensor dtype 完全相同，且本 SPEC 仅支持 float32。
-- 不执行广播、规约、reshape、rank 变更或 layout 变更。
-- 不读取其他输入，不使用 attributes，不依赖元素之间的顺序或相邻关系。
-- 对空 Tensor，返回同 shape、同 dtype 的空 Tensor。
-- 对标量 Tensor，返回标量 Tensor，值为输入标量的绝对值。
-- 行为语义应与 PyTorch ATen `aten::abs` 在 float32 Tensor 上的逐元素绝对值语义保持一致。
+- Positive finite values return the same numeric value.
+- Negative finite values return the corresponding positive value.
+- `+0.0` returns `+0.0`.
+- `-0.0` returns numeric `+0.0`.
+- `+Inf` returns `+Inf`.
+- `-Inf` returns `+Inf`.
+- `NaN` returns `NaN`.
+
+The output shape, rank, dtype, and layout are the same as the input. The operator has no broadcasting, no reduction, no reshape, and no cross-element dependency. The call must not modify the input Tensor value or metadata.
+
+Behavior must be compatible with PyTorch ATen `aten::abs(Tensor self) -> Tensor` for float32 Tensor elementwise absolute value, within the constraints stated by the PRD.
 
 ## 10. Numeric Semantics / 数值语义
-Abs 的 float32 数值语义如下：
+For all finite float32 values, the output is the exact float32 absolute-value result. Abs is a sign-processing elementwise operator, and the PRD defines no additional approximate error tolerance.
 
-- 正有限数输出其自身数值。
-- 负有限数输出对应正数。
-- `+0.0` 输出 `+0.0`。
-- `-0.0` 输出数值为 `+0.0`。
-- `+Inf` 输出 `+Inf`。
-- `-Inf` 输出 `+Inf`。
-- `NaN` 输出为 `NaN`。
-- PRD 不要求规定 NaN payload 或 NaN 符号位保持策略。
-- 对所有 float32 有限数输入，绝对值结果仍为 float32，并且不定义额外近似误差容忍度。
-- 对 `+Inf`、`-Inf` 和 `NaN`，遵循上述特殊值传播规则。
-- 本 SPEC 不定义 float32 以外 dtype 的舍入、溢出、下溢或提升行为。
+Signed zero behavior is fixed by the PRD: `+0.0` produces `+0.0`, and `-0.0` produces numeric `+0.0`.
+
+Infinity behavior is fixed by the PRD: `+Inf` and `-Inf` both produce `+Inf`.
+
+NaN behavior is fixed by the PRD at the observable value level: an input `NaN` produces an output `NaN`. The PRD does not require preservation of NaN payload or NaN sign bit, so this SPEC does not impose a payload or sign-bit preservation rule for NaN.
+
+No rounding, overflow, or underflow rule beyond float32 absolute-value behavior is introduced by this SPEC.
 
 ## 11. Shape Semantics / Shape 语义
-输出 shape 直接等于输入 `x` 的 shape。Abs 不进行广播、规约、reshape、flatten、transpose 或 rank 改变。0 维标量 Tensor 的 shape 保持为 `()`；任一维长度为 0 的空 Tensor 保持原 shape。
+The output shape is exactly the input shape. The output rank is exactly the input rank. Scalar Tensor input with rank 0 returns scalar Tensor output with rank 0. Empty Tensor input, including any input shape with at least one zero-sized dimension, returns an empty Tensor with the same shape. No broadcasting, reduction, reshape, squeeze, unsqueeze, or symbolic dimension transformation is performed.
 
 ```python
 import numpy as np
 
-def abs(x):
-    """
-    Infer output shape metadata for Abs.
+def abs(self):
+    """InferShape reference for Abs.
 
     Args:
-        x: Required tensor-like metadata object for the input Tensor. It must
-            expose a shape attribute representing any legal Tensor shape,
-            including () for a rank-0 scalar tensor and shapes containing
-            zero-sized dimensions for empty tensors. x is required and is not
-            optional. Shape inference does not inspect or compute element
-            values.
+        self: Tensor metadata object for input `x`. It must expose shape
+            metadata either as a `shape` attribute or as a dictionary entry named
+            `shape`. The shape may be rank 0 `()`, any non-empty tuple/list of
+            non-negative integer dimensions, or a shape containing one or more
+            zero-sized dimensions.
 
     Returns:
-        tuple: The exact output shape. The returned shape is identical to
-        x.shape. Rank-0 scalar tensors return (), and empty tensors preserve all
-        zero-sized dimensions.
+        Tuple[int, ...]: Output shape metadata. The returned shape is exactly
+        the input shape.
 
     Raises:
-        TypeError: If x does not expose tensor shape metadata.
-        ValueError: If a dimension is negative.
+        TypeError: If shape metadata is unavailable or is not a sequence of
+            dimensions for non-scalar tensors.
+        ValueError: If any concrete dimension is negative.
 
     Shape-rule notes:
-        Abs is an elementwise identity-shape operator. It has no broadcasting,
-        reduction, reshape, or symbolic dimension transformation rule.
+        Abs uses an identity shape rule. It performs no broadcasting, reduction,
+        reshape, or rank change. Empty and scalar shapes are preserved.
     """
-    shape = getattr(x, "shape", None)
+    shape = self.get("shape") if isinstance(self, dict) else getattr(self, "shape", None)
     if shape is None:
-        raise TypeError("Abs shape inference requires tensor shape metadata for x.")
+        raise TypeError("Abs InferShape requires tensor shape metadata")
 
-    normalized_shape = tuple(int(dim) for dim in tuple(shape))
-    if any(dim < 0 for dim in normalized_shape):
-        raise ValueError("Abs shape inference requires non-negative dimensions.")
+    normalized_shape = tuple(np.atleast_1d(shape).tolist()) if shape != () else ()
+    for dim in normalized_shape:
+        if int(dim) < 0:
+            raise ValueError("Abs shape dimensions must be non-negative")
 
-    shape_rules = {
-        "identity": lambda input_shape: input_shape,
-    }
-    return shape_rules["identity"](normalized_shape)
+    shape_rules = (
+        ("identity", lambda input_shape: tuple(int(dim) for dim in input_shape)),
+    )
+    return shape_rules[0][1](normalized_shape)
 ```
 
 ## 12. Data Type Support / 数据类型支持
-Abs 仅支持输入 dtype 为 float32。输出 dtype 与输入 dtype 相同，仍为 float32。不支持 dtype promotion，不支持 float32 以外 dtype，不支持复数、量化或非 Tensor dtype 语义。
+Abs supports float32 input Tensor only. The output dtype is float32 and is identical to the input dtype. The operator performs no dtype promotion, demotion, casting, or mixed-dtype behavior.
+
+Inputs with dtype other than float32 are outside the supported functional scope of this SPEC. Non-Tensor inputs are also outside the supported functional scope.
 
 ```python
 import numpy as np
 
-def abs(x):
-    """
-    Infer output dtype metadata for Abs.
+def abs(self):
+    """InferDtype reference for Abs.
 
     Args:
-        x: Required tensor-like metadata object for the input Tensor. It must
-            expose dtype metadata. The only supported dtype is float32. x is
-            required and is not optional. Dtype inference does not inspect or
-            compute element values.
+        self: Tensor metadata object for input `x`. It must expose dtype
+            metadata either as a `dtype` attribute or as a dictionary entry named
+            `dtype`. The only supported dtype is float32.
 
     Returns:
-        numpy.dtype: np.dtype("float32") when x.dtype is float32.
+        numpy.dtype: Output dtype metadata. The returned dtype is `np.float32`.
 
     Raises:
-        TypeError: If x does not expose dtype metadata or if x.dtype is not
-        float32.
+        TypeError: If dtype metadata is unavailable or if the input dtype is not
+            float32.
 
     Promotion-rule notes:
-        Abs has no dtype promotion rule in this SPEC. The table maps the single
-        supported input dtype directly to the output dtype.
+        Abs has no dtype promotion, no dtype conversion, and no mixed-dtype
+        behavior. The single supported dtype rule maps float32 input to float32
+        output.
     """
-    dtype = getattr(x, "dtype", None)
+    dtype = self.get("dtype") if isinstance(self, dict) else getattr(self, "dtype", None)
     if dtype is None:
-        raise TypeError("Abs dtype inference requires tensor dtype metadata for x.")
-
-    dtype_rules = {
-        np.dtype("float32"): np.dtype("float32"),
-    }
+        raise TypeError("Abs InferDtype requires tensor dtype metadata")
 
     normalized_dtype = np.dtype(dtype)
-    if normalized_dtype not in dtype_rules:
-        raise TypeError("Abs supports only float32 input tensors.")
+    dtype_rules = (
+        (np.dtype("float32"), np.dtype("float32")),
+    )
+    for input_dtype, output_dtype in dtype_rules:
+        if normalized_dtype == input_dtype:
+            return output_dtype
 
-    return dtype_rules[normalized_dtype]
+    raise TypeError("Abs supports only float32 input dtype")
 ```
 
 ## 13. Layout and Format Constraints / Layout 与 Format 约束
-PRD 不要求改变输入 Tensor 的 shape、rank、layout 或 dtype。因此，Abs 的输出必须保持与输入一致的可观察 Tensor shape/rank/dtype 语义，并且本 SPEC 不引入 layout 转换、format 转换或 contiguous-only 要求。
+Abs does not change input layout or tensor format. The output layout is identical to the input layout.
 
-稀疏 Tensor、量化 Tensor 和非 Tensor 输入不属于支持范围。除 PRD 明确排除项外，本 SPEC 不添加额外 layout 或 format 条件。
+The PRD does not introduce a contiguity requirement, a layout conversion requirement, or a special tensor format requirement beyond operating on a valid float32 Tensor in the target environment.
 
 ## 14. Boundary Cases / 边界场景
-Abs 必须覆盖以下边界场景：
-
-- 正有限 float32：输出与输入数值相同。
-- 负有限 float32：输出对应正数。
-- `+0.0`：输出 `+0.0`。
-- `-0.0`：输出数值为 `+0.0`。
-- `+Inf`：输出 `+Inf`。
-- `-Inf`：输出 `+Inf`。
-- `NaN`：输出为 `NaN`；NaN payload 与符号位保持策略不在 PRD 要求范围内。
-- 0 维标量 Tensor：输出仍为 0 维标量 Tensor，数值为输入绝对值。
-- 空 Tensor：输出为空 Tensor，shape 与 dtype 与输入一致，不产生元素级计算结果。
-- 任意维度非空 Tensor：输出 shape 与输入 shape 完全一致，dtype 为 float32。
+- Rank 0 scalar Tensor: output remains rank 0 scalar Tensor, with value equal to the scalar absolute value.
+- Empty Tensor: output is empty, and shape, rank, dtype, and layout are identical to input.
+- Tensor with one or more zero-sized dimensions: output preserves the same zero-sized dimensions.
+- Positive finite values: output equals input numeric value.
+- Negative finite values: output equals the corresponding positive value.
+- `+0.0`: output is `+0.0`.
+- `-0.0`: output numeric value is `+0.0`.
+- `+Inf`: output is `+Inf`.
+- `-Inf`: output is `+Inf`.
+- `NaN`: output is `NaN`; NaN payload and sign-bit preservation are not required by the PRD.
 
 ## 15. Error Handling / 错误处理
-合法调用必须满足：输入 `x` 是 float32 Tensor，且其 shape 是合法 Tensor shape。对合法的空 Tensor 与标量 Tensor，算子调用应成功。
+Conforming calls require `self` to be a Tensor with dtype float32.
 
-以下输入不属于本 SPEC 的成功执行范围：
+If the caller provides a non-Tensor input or a Tensor whose dtype is not float32, the input is unsupported by this SPEC. Such calls must not be reported as successful Abs computations under this SPEC. The exact diagnostic text and exception class are not specified by the PRD, but validation should be able to distinguish unsupported dtype or non-Tensor input from a successful float32 Tensor call.
 
-- float32 以外 dtype。
-- 非 Tensor 输入。
-- 复数 Tensor。
-- 量化 Tensor。
-- 稀疏 Tensor。
-
-对这些不支持输入，算子不得返回一个被视为本 SPEC 合法 Abs 结果的成功输出。具体异常类型、错误码和诊断文本由调用框架或上层接口约定；本 SPEC 仅要求错误行为能够区分其不属于 float32 Tensor Abs 的支持范围。
+Valid scalar Tensor and empty Tensor inputs must not be rejected solely because of rank 0 or zero element count.
 
 ## 16. Compatibility / 兼容性说明
-Abs 的行为语义应与 PyTorch ATen `aten::abs` 在 float32 Tensor 上的逐元素绝对值语义保持一致。
+Abs must be behaviorally compatible with PyTorch ATen `aten::abs(Tensor self) -> Tensor` for float32 Tensor elementwise absolute value.
 
-兼容性要求包括：
+The supported schema is:
 
-- ATen schema：`aten::abs(Tensor self) -> Tensor`。
-- `self` 对应输入 `x`，返回值对应输出 `y`。
-- 输入为 `NaN` 时，输出必须为 `NaN`；不要求 NaN payload 或 NaN 符号位保持策略。
-- 输入为 `-0.0` 时，输出数值必须为 `+0.0`。
-- 合法空 Tensor 与标量 Tensor 调用应成功并返回符合 shape 与 dtype 要求的输出。
-- 不支持的 dtype 或非 Tensor 输入不属于 PRD 功能范围。
+```text
+aten::abs(Tensor self) -> Tensor
+```
+
+The PRD does not require compatibility for dtype other than float32, complex values, quantized tensors, sparse tensors, non-Tensor inputs, gradients, reverse-mode behavior, or automatic differentiation behavior.
+
+For NaN input, output must be NaN. The PRD explicitly does not require NaN payload or sign-bit preservation.
 
 ## 17. Performance Requirements / 性能要求
-PRD 不引入性能指标、吞吐指标或延迟指标。因此，本 SPEC 不定义额外可度量性能要求。
+No additional measurable performance, throughput, or latency requirement is established by the PRD.
 
 ## 18. Acceptance Criteria / 验收标准
-Abs 的验收标准如下：
-
-- 给定 float32 Tensor `x = [1.0, 2.5, +0.0]`，输出为 `[1.0, 2.5, +0.0]`。
-- 给定 float32 Tensor `x = [-1.0, -2.5, -0.0]`，输出数值为 `[1.0, 2.5, +0.0]`。
-- 给定包含 `NaN` 的 float32 Tensor，输出对应位置为 `NaN`。
-- 给定包含 `+Inf` 和 `-Inf` 的 float32 Tensor，输出对应位置均为 `+Inf`。
-- 给定任意维度的非空 float32 Tensor，输出 shape 与输入 shape 完全一致，dtype 为 float32。
-- 给定 0 维 float32 标量 Tensor，输出为 0 维 float32 标量 Tensor，数值为输入绝对值。
-- 给定空 float32 Tensor，输出为空 Tensor，shape 与 dtype 与输入一致。
-- Shape 推导必须返回与输入 shape 完全相同的 shape metadata。
-- Dtype 推导必须对 float32 输入返回 float32，且不执行 dtype promotion。
-- 算子不得修改输入 Tensor 的值或元数据。
-- 对不属于 float32 Tensor 的输入，验收不要求通过本算子功能测试，并且不得被视为本 SPEC 的合法成功输出。
+- Given float32 Tensor `x = [1.0, 2.5, +0.0]`, output `y` is `[1.0, 2.5, +0.0]`.
+- Given float32 Tensor `x = [-1.0, -2.5, -0.0]`, output `y` has numeric values `[1.0, 2.5, +0.0]`.
+- Given a float32 Tensor containing `NaN`, each corresponding output position is `NaN`.
+- Given a float32 Tensor containing `+Inf` and `-Inf`, each corresponding output position is `+Inf`.
+- Given any non-empty float32 Tensor with arbitrary valid rank and shape, output shape equals input shape exactly and output dtype is float32.
+- Given a rank 0 float32 scalar Tensor, output is a rank 0 float32 scalar Tensor whose value is the input absolute value.
+- Given an empty float32 Tensor, output is an empty Tensor with the same shape, rank, layout, and dtype as input.
+- Given a valid float32 input Tensor, the operator does not mutate the input Tensor values or metadata.
+- Shape inference returns exactly the input shape for scalar, empty, and non-empty Tensor shapes.
+- Dtype inference accepts float32 input and returns float32 output without promotion or casting.
+- Inputs outside float32 Tensor scope are not required to pass functional Abs tests for this SPEC.
 
 ## 19. Open Issues / 待确认问题
-无
+None

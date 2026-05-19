@@ -7,61 +7,62 @@ score_breakdown:
   goal_clarity:
     score: 10
     max: 10
-    comment: "Goal is explicit: float32 Abs on dav-2201 with same-shape output and defined edge values."
+    comment: "Goal is explicit, operator-specific, and tied to dav-2201 usage."
   scope_completeness:
     score: 15
     max: 15
-    comment: "Scope covers dtype, shape preservation, scalar, empty tensor, arbitrary rank, and IEEE float32 edge values."
+    comment: "Defines dtype, shape preservation, ranks, scalar, empty tensors, and special float values."
   boundary_clarity:
     score: 15
     max: 15
-    comment: "Non-goals and constraints clearly exclude other dtypes, gradients, complex, sparse, quantized, and implementation design."
+    comment: "Non-goals and unsupported inputs are explicit and prevent scope expansion."
   verifiability:
-    score: 18
+    score: 19
     max: 20
-    comment: "Acceptance criteria are directly testable, though arbitrary-rank coverage could name representative concrete shapes."
+    comment: "Acceptance criteria are concrete and cover normal, boundary, scalar, and empty cases."
   unambiguity:
     score: 10
     max: 10
-    comment: "Requirements use precise dtype, shape, operator schema, and numerical semantics with low ambiguity."
+    comment: "Language is precise and uses direct expected behaviors."
   internal_consistency:
     score: 10
     max: 10
-    comment: "Goals, constraints, compatibility notes, and acceptance criteria are consistent."
+    comment: "Requirements, constraints, compatibility notes, and acceptance criteria agree."
   stage_boundary_correctness:
     score: 10
     max: 10
-    comment: "Document stays at product behavior level and explicitly excludes kernel, tiling, memory, scheduling, and instruction choices."
+    comment: "The PRD avoids kernel, tiling, memory, scheduling, and instruction details."
   risk_and_open_question_management:
-    score: 3
+    score: 2
     max: 5
-    comment: "Open questions are declared as none, but dependency and risk classification is minimal."
+    comment: "Open questions are declared none, but residual semantic choices such as NaN payload are only partly classified."
   document_structure_and_readability:
     score: 4
     max: 5
-    comment: "Structure is clear and stable, with minor repetition across numerical semantics sections."
+    comment: "Structure is clear and readable, with minor repetition across semantic sections."
 
 key_strengths:
-  - "Clear float32 input/output contract with same shape and dtype."
-  - "Boundary values including zero signs, infinities, NaN, scalar tensors, and empty tensors are explicitly covered."
-  - "PRD/SPEC/DESIGN stage boundary is well maintained."
+  - "Clear operator goal, input-output contract, and target architecture."
+  - "Strong coverage of float32 edge cases including signed zero, infinities, NaN, scalar, and empty tensors."
+  - "PRD/SPEC boundary is well maintained with explicit non-goals for implementation details."
 
 key_issues:
-  - "Acceptance criteria do not name representative concrete shapes for arbitrary-rank behavior beyond scalar and empty tensors."
-  - "Risk and dependency management is thin because open questions are marked none without explaining reviewed risks."
+  - "Risk and open-question management is thin because all open questions are marked none despite partially unspecified NaN payload and sign behavior."
+  - "Acceptance criteria are testable but could add explicit rank or multidimensional examples beyond generic arbitrary-dimension wording."
 
 blocking_issues: []
 
 improvement_suggestions:
-  - "Add representative acceptance cases for 1D, 2D, and higher-rank tensors with explicit shapes."
-  - "Add a short risk review noting that NaN payload/sign preservation is intentionally out of scope and that dav-2201 support is the only architecture target."
+  - "Classify NaN payload and sign preservation as an explicit non-requirement or open compatibility decision."
+  - "Add at least one multidimensional tensor acceptance case to make arbitrary-rank behavior directly test-covered."
+  - "State the expected behavior for output allocation or aliasing only if product requirements need to constrain it."
 
 spec_entry_decision:
   allowed: true
-  reason: "The PRD exceeds SPEC entry gates with clear scope, boundaries, input/output behavior, and testable acceptance criteria."
+  reason: "The PRD exceeds SPEC entry thresholds with clear scope, boundaries, input-output behavior, and testable acceptance criteria."
 
 review_notes:
   assumptions:
-    - "The PRD path is the single requested review target."
+    - "The PRD is evaluated as a product requirements document, not as a detailed SPEC."
   warnings:
-    - "SPEC should turn arbitrary-dimension support into concrete shape classes and automated tests."
+    - "NaN payload and NaN sign are intentionally not required, so SPEC should preserve that as a non-requirement unless compatibility policy changes."

@@ -1,4 +1,4 @@
-已创建 Abs 算子 PRD：[docs/mozi/abs/prd.md](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/prd.md)。
+已生成 Abs 算子 PRD：[docs/mozi/abs/prd.md](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/prd.md)。
 
 校验已通过：
 
@@ -6,4 +6,4 @@
 PRD validation passed: docs/mozi/abs/prd.md
 ```
 
-内容覆盖了 float32 输入输出、任意维度、标量/空 Tensor、`+0.0`/`-0.0`、`NaN`、`+Inf`、`-Inf`，并限定目标架构为 NPU ARCH `dav-2201`。
+我只重建/修改了 `docs/mozi/abs/prd.md`；同目录下已有的其他删除状态文件未处理。

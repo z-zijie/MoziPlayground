@@ -29,30 +29,16 @@ Abs 算子用于对输入 Tensor 的每个 float32 元素取绝对值，是数�
 - 输出 `y` 的 shape 必须与输入 `x` 完全相同。
 - Abs 必须对输入 Tensor 的每个元素独立执行绝对值计算，不进行广播、规约或跨元素依赖计算。
 - 对任意有效元素索引 `i`，输出必须满足 `y[i] = |x[i]|`。
-- 算子必须支持任意维度 Tensor，包括：
-  - 0 维标量 Tensor；
-  - 1 维及以上普通 Tensor；
-  - 任一维长度为 0 的空 Tensor。
+- 算子必须支持任意维度 Tensor，包括 0 维标量 Tensor、1 维及以上普通 Tensor，以及任一维长度为 0 的空 Tensor。
 - 对空 Tensor，输出必须为空 Tensor，shape 与 dtype 与输入一致，且不产生元素级计算结果。
 - 对标量 Tensor，输出必须仍为标量 Tensor。
-- 边界数值语义必须满足：
-  - 正有限数输出其自身数值；
-  - 负有限数输出对应正数；
-  - `+0.0` 输出 `+0.0`；
-  - `-0.0` 输出数值为 `+0.0`；
-  - `+Inf` 输出 `+Inf`；
-  - `-Inf` 输出 `+Inf`；
-  - `NaN` 输出为 `NaN`。
+- 边界数值语义必须满足：正有限数输出其自身数值；负有限数输出对应正数；`+0.0` 输出 `+0.0`；`-0.0` 输出数值为 `+0.0`；`+Inf` 输出 `+Inf`；`-Inf` 输出 `+Inf`；`NaN` 输出为 `NaN`。
 
 ## 6. Input and Output Overview / 输入输出概述
-- 输入：
-  - `x`: float32 Tensor，shape 为任意合法 Tensor shape。
-- 输出：
-  - `y`: float32 Tensor，shape 与 `x` 相同。
-- 输入输出关系：
-  - `y = abs(x)`；
-  - `y[i] = |x[i]|`；
-  - 输出 Tensor 不改变输入 Tensor 的维度数量、各维大小或 dtype。
+- 输入：`x`，float32 Tensor，shape 为任意合法 Tensor shape。
+- 输出：`y`，float32 Tensor，shape 与 `x` 相同。
+- 输入输出关系：`y = abs(x)`，且 `y[i] = |x[i]|`。
+- 输出 Tensor 不改变输入 Tensor 的维度数量、各维大小或 dtype。
 
 ## 7. NPU ARCH
 目标架构范围为 NPU ARCH dav-2201。该 PRD 仅定义 Abs 算子在 dav-2201 上需要支持的产品行为、输入输出接口、数值语义和验收要求，不包含具体硬件执行设计。
@@ -101,7 +87,7 @@ aten::abs(Tensor self) -> Tensor
 - 对不属于 float32 Tensor 的输入，验收不要求通过本算子功能测试。
 
 ## 13. Open Questions / 待澄清问题
-无
+None
 
 ## 14. References / 参考资料
 - 用户需求：开发 Abs 算子，输入 float32 Tensor `x`，输出同 shape、同 dtype Tensor `y`，满足 `y[i] = |x[i]|`，支持任意维度与指定边界场景，目标 NPU ARCH dav-2201。
