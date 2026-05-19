@@ -20,7 +20,7 @@ codex plugin marketplace upgrade
 prd_path="$script_dir/docs/mozi/abs/prd.md"
 operator_dir="$(dirname "$prd_path")"
 spec_path="$operator_dir/spec.md"
-rm -rf spec_path
+rm -rf "$spec_path"
 create_spec_result_path="$operator_dir/.codex-create-spec-result.txt"
 
 if [[ ! -r "$prd_path" ]]; then
@@ -29,7 +29,7 @@ if [[ ! -r "$prd_path" ]]; then
 fi
 
 codex exec \
-  --model gpt-5.4-mini \
+  --model gpt-5.5 \
   --dangerously-bypass-approvals-and-sandbox \
   --skip-git-repo-check \
   --output-last-message "$create_spec_result_path" \
