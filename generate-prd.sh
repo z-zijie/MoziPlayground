@@ -80,7 +80,7 @@ PROMPT
 }
 
 codex exec \
-  --model gpt-5.4-mini \
+  --model gpt-5.5 \
   --dangerously-bypass-approvals-and-sandbox \
   --skip-git-repo-check \
   --output-last-message "$create_prd_result_path" \

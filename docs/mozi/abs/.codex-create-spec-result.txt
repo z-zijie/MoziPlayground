@@ -1,3 +1,9 @@
-已基于 `/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/prd.md` 生成并覆盖 `SPEC`，文件为 [`/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md`](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md)。
+已基于 PRD 以 Create Mode 生成并覆盖 sibling SPEC：
 
-已通过 Mozi 校验。
+[docs/mozi/abs/spec.md](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md)
+
+校验已通过：
+
+`python3 /Users/eureka/.codex/plugins/cache/mozi-marketplace/mozi/0.1.0/skills/create-spec/scripts/validate_spec.py docs/mozi/abs/spec.md --operator Abs`
+
+另外 Mozi 结果文件 [docs/mozi/abs/.codex-create-spec-result.txt](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/.codex-create-spec-result.txt) 也记录了生成与校验通过状态。
