@@ -60,7 +60,8 @@ review_passed() {
 
 revise_prd_from_review() {
   codex exec \
-    --model gpt-5.4-mini \
+    --model gpt-5.5 \
+    -c model_reasoning_effort=high \
     --dangerously-bypass-approvals-and-sandbox \
     --skip-git-repo-check \
     --output-last-message "$create_prd_result_path" \
@@ -81,6 +82,7 @@ PROMPT
 
 codex exec \
   --model gpt-5.5 \
+  -c model_reasoning_effort=high \
   --dangerously-bypass-approvals-and-sandbox \
   --skip-git-repo-check \
   --output-last-message "$create_prd_result_path" \

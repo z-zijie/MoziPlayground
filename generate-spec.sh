@@ -30,6 +30,7 @@ fi
 
 codex exec \
   --model gpt-5.5 \
+  -c model_reasoning_effort=xhigh \
   --dangerously-bypass-approvals-and-sandbox \
   --skip-git-repo-check \
   --output-last-message "$create_spec_result_path" \

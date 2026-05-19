@@ -1,9 +1,11 @@
-已基于 PRD 以 Create Mode 生成并覆盖 sibling SPEC：
+已按 Create Mode 基于 PRD 生成并覆盖 SPEC：[docs/mozi/abs/spec.md](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md)。
 
-[docs/mozi/abs/spec.md](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/spec.md)
+验证已通过：
 
-校验已通过：
+```bash
+python3 /Users/eureka/.codex/plugins/cache/mozi-marketplace/mozi/0.1.0/skills/create-spec/scripts/validate_spec.py docs/mozi/abs/spec.md --operator Abs
+```
 
-`python3 /Users/eureka/.codex/plugins/cache/mozi-marketplace/mozi/0.1.0/skills/create-spec/scripts/validate_spec.py docs/mozi/abs/spec.md --operator Abs`
+结果：`SPEC validation passed`。
 
-另外 Mozi 结果文件 [docs/mozi/abs/.codex-create-spec-result.txt](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/.codex-create-spec-result.txt) 也记录了生成与校验通过状态。
+我只修改了 `spec.md`；`prd.md` 当前在 git 状态里也是 modified，但不是这次生成过程改的。
