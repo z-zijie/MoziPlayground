@@ -1,0 +1,8 @@
+已生成并通过校验：
+
+- [PRD 文件](/Users/eureka/Workspace/MoziPlayground/docs/mozi/abs/prd.md)
+
+验证结果：
+- `PRD validation passed: docs/mozi/abs/prd.md`
+
+如果你要，我可以继续补一版更偏实现落地的 SPEC 草案，或者直接开始拆分 `Abs` 的算子设计与测试点。
